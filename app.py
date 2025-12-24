@@ -107,4 +107,105 @@ with tab1:
                     sheet_log.append_rows(rows_to_add)
                     st.success(f"保存しました！ りく:{amount_riku}円、みなみ:{amount_minami}円")
             
-            st.
+            st.rerun()
+
+# ------------------------------------------
+# タブ2：履歴・編集・分析（カレンダーの代わりにここを充実！）
+# ------------------------------------------
+with tab2:
+    st.subheader('📊 データの履歴と編集')
+    st.caption("👇 表の中をダブルクリックすると書き換えられます！")
+    
+    if not df.empty:
+        # データ編集用エディタ
+        edited_df = st.data_editor(
+            df, 
+            num_rows="dynamic", # 行の追加削除も可能に
+            use_container_width=True,
+            key="history_editor"
+        )
+        
+        # 変更を保存するボタン
+        if st.button("変更をスプレッドシートに保存する"):
+            updated_data = [edited_df.columns.tolist()] + edited_df.astype(str).values.tolist()
+            sheet_log.clear()
+            sheet_log.update(updated_data)
+            st.success("スプレッドシートを更新しました！")
+            st.rerun()
+            
+        st.divider()
+        
+        # --- 簡易分析 ---
+        current_m = datetime.now().month
+        st.markdown(f"##### 📊 {current_m}月の内訳")
+        df_m = df[df['月'] == current_m]
+        if not df_m.empty:
+            col_g1, col_g2 = st.columns(2)
+            with col_g1:
+                fig = px.pie(df_m, values='金額', names='カテゴリー', hole=0.4)
+                st.plotly_chart(fig, use_container_width=True)
+            with col_g2:
+                # 精算計算
+                shared = df_m[df_m['種別'] == '共通（割り勘）']
+                riku_pay = shared[shared['支払者'] == 'りく']['金額'].sum()
+                minami_pay = shared[shared['支払者'] == 'みなみ']['金額'].sum()
+                diff = riku_pay - minami_pay
+                
+                st.write(f"りく支払: **{riku_pay:,}** 円")
+                st.write(f"みなみ支払: **{minami_pay:,}** 円")
+                if diff > 0:
+                    st.info(f"👉 **みなみ** → **りく** に **{diff//2:,}円** 渡す")
+                elif diff < 0:
+                    st.info(f"👉 **りく** → **みなみ** に **{abs(diff)//2:,}円** 渡す")
+    else:
+        st.info("データがありません")
+
+# ------------------------------------------
+# タブ3：買い物リスト
+# ------------------------------------------
+with tab3:
+    st.subheader('🛒 買い物＆欲しいものリスト')
+    st.caption("👇 表の「お店」や「品目」をクリックすると並び替えできます！")
+    
+    # 新規追加フォーム
+    with st.expander("➕ 新しいアイテムを追加する"):
+        with st.form("shop_form", clear_on_submit=True):
+            c1, c2, c3, c4 = st.columns([2, 2, 1, 2])
+            item = c1.text_input("買うもの")
+            shop = c2.text_input("お店・場所")
+            price = c3.number_input("予想金額", step=100)
+            memo_shop = c4.text_input("メモ")
+            
+            if st.form_submit_button("リストに追加"):
+                sheet_shop.append_row([item, shop, price, "未購入", memo_shop])
+                st.success("追加しました！")
+                st.rerun()
+
+    # 編集可能なリスト表示
+    if not df_shop.empty:
+        edited_shop_df = st.data_editor(
+            df_shop,
+            use_container_width=True,
+            num_rows="dynamic",
+            column_config={
+                "ステータス": st.column_config.SelectboxColumn(
+                    "ステータス",
+                    options=["未購入", "購入済"],
+                    required=True,
+                ),
+                "予想金額": st.column_config.NumberColumn(
+                    "予想金額",
+                    format="¥%d",
+                ),
+            },
+            key="shop_editor"
+        )
+        
+        if st.button("買い物リストの変更を保存する"):
+            updated_shop_data = [edited_shop_df.columns.tolist()] + edited_shop_df.astype(str).values.tolist()
+            sheet_shop.clear()
+            sheet_shop.update(updated_shop_data)
+            st.success("買い物リストを更新しました！")
+            st.rerun()
+    else:
+        st.info("買い物リストは空っぽです")
