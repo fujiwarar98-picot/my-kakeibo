@@ -78,7 +78,7 @@ with tab1:
         
         with col2:
             payer = st.radio("誰が払った？（財布を出した人）", ["りく", "みなみ"], horizontal=True)
-            type_option = st.radio("支出の種類は？", ["共通（割り勘）", "りく個人", "みなみ個人"], horizontal=True)
+            type_option = st.radio("支出の種類は？", ["共通（割り勘）", "りく", "みなみ"], horizontal=True)
             memo = st.text_input("メモ（店名など）")
         
         submitted = st.form_submit_button("家計簿に保存する")
@@ -223,3 +223,4 @@ with tab4:
             st.dataframe(done_items)
     else:
         st.info("買い物リストは空っぽです")
+
