@@ -3,7 +3,8 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from datetime import datetime
-from streamlit_calendar import calendar  # 👈 カレンダーの魔法
+from streamlit_calendar import calendar
+import plotly.express as px  # 👈 これが抜けていました！
 
 # ==========================================
 # ★設定（スプレッドシートのURLだけ書き換えて！）
@@ -21,7 +22,9 @@ try:
         key_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(key_dict, scope)
     else:
+        # PCで動かす時用
         creds = ServiceAccountCredentials.from_json_keyfile_name("secret.json", scope)
+    
     client = gspread.authorize(creds)
     sheet = client.open_by_url(SHEET_URL).sheet1
 except Exception as e:
@@ -33,7 +36,7 @@ records = sheet.get_all_records()
 df = pd.DataFrame(records) if records else pd.DataFrame()
 
 # ==========================================
-# 画面を「タブ」で分ける！
+# 画面を「タブ」で分ける
 # ==========================================
 tab1, tab2, tab3 = st.tabs(["📝 入力", "📅 カレンダー", "📊 分析"])
 
@@ -59,23 +62,20 @@ with tab1:
             new_row = [str(date), category, amount, memo, buyer]
             sheet.append_row(new_row)
             st.success(f"保存完了！: {category} {amount}円")
-            st.rerun() # 保存したら即更新
+            st.rerun()
 
 # ------------------------------------------
-# タブ2：カレンダー画面（★ここが新機能！）
+# タブ2：カレンダー画面
 # ------------------------------------------
 with tab2:
     st.subheader('📅 支出カレンダー')
     if not df.empty:
-        # カレンダー用にデータを変換する
         events = []
         for index, row in df.iterrows():
-            # カレンダーに表示する文字を作る（例：🍔 食費 -1,000）
             title = f"{row['カテゴリー']} ¥{row['金額']}"
             if row['メモ']:
                 title += f" ({row['メモ']})"
             
-            # 色を変える（競馬などは目立たせる！）
             color = "#FF6C6C" if "競馬" in row['カテゴリー'] else "#3788d8"
 
             events.append({
@@ -85,7 +85,6 @@ with tab2:
                 "borderColor": color,
             })
 
-        # カレンダーを表示！
         calendar_options = {
             "headerToolbar": {
                 "left": "today prev,next",
@@ -98,26 +97,22 @@ with tab2:
         st.info("データがまだありません")
 
 # ------------------------------------------
-# タブ3：分析画面（★グラフ化！）
+# タブ3：分析画面（円グラフ）
 # ------------------------------------------
 with tab3:
     st.subheader('📊 収支レポート')
     if not df.empty:
-        # 1. 今月の合計をドーンと表示
+        # 合計金額
         total = df["金額"].sum()
         st.metric("今月の合計出費", f"{total:,} 円")
         
-        # 2. カテゴリーごとの円グラフ（ドーナツ型）
-        # 金額で集計する
+        # 円グラフ作成
         category_sum = df.groupby("カテゴリー")["金額"].sum().reset_index()
-        
         fig = px.pie(category_sum, values='金額', names='カテゴリー', 
-                     title='何にお金使ってる？', hole=0.5) # hole=0.5でドーナツ型に
+                     title='何にお金使ってる？', hole=0.5)
         st.plotly_chart(fig, use_container_width=True)
         
-        # 3. 履歴リスト（詳細は下に隠しておく）
         with st.expander("詳細な履歴を見る"):
             st.dataframe(df.sort_values(by="日付", ascending=False))
     else:
         st.info("データがまだありません")
-
